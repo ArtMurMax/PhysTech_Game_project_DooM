@@ -47,44 +47,31 @@ class Bullet(pygame.sprite.Sprite):
         if self.rect.bottom < 0:
             self.kill()
 
-class Player(pygame.sprite.Sprite):
-    def __init__(self):
+class Mob(pygame.sprite.Sprite):
+    def __init__(self, point, image):
         pygame.sprite.Sprite.__init__(self)
-        self.original_image = player_img
+        self.original_image = image
         self.image = self.original_image
         self.rect = self.image.get_rect()
-        self.rect.center = (WIDTH / 2, HEIGHT / 2)
+        self.rect.center = (point.x, point.y)
         self.angle = 0
         self.vector_gun_start = Vector(0, self.rect.top - self.rect.centery)
         self.point_gun = self.vector_gun_start + Vector(self.rect.centerx, self.rect.centery)
 
-    def update(self):
-        velocity_rel = Vector(0, 0)
-        w = 0
+    def shoot(self):
+        bullet = Bullet(self.point_gun, self.angle)
+        all_sprites.add(bullet)
+        bullets.add(bullet)
 
-        keystate = pygame.key.get_pressed()
-        if keystate[pygame.K_LEFT]:
-            w = 5 * math.pi / 180
-        if keystate[pygame.K_RIGHT]:
-            w = -5 * math.pi / 180
-        self.angle += w
+    def move(self):
+        self.angle += self.w
         self.image = pygame.transform.rotate(self.original_image, int(self.angle * 180 / math.pi))
         self.rect = self.image.get_rect(center=self.rect.center)
         self.point_gun.x = self.vector_gun_start.x * math.cos(self.angle) + self.vector_gun_start.y * math.sin(self.angle) + self.rect.centerx
         self.point_gun.y = - self.vector_gun_start.x * math.sin(self.angle) + self.vector_gun_start.y * math.cos(self.angle) + self.rect.centery
 
-        if keystate[pygame.K_a]:
-            velocity_rel.x = -8
-        if keystate[pygame.K_d]:
-            velocity_rel.x = 8
-
-        if keystate[pygame.K_w]:
-            velocity_rel.y = -8
-        if keystate[pygame.K_s]:
-            velocity_rel.y = 8
-
-        self.velocity = Vector(velocity_rel.x * math.cos(self.angle) + velocity_rel.y * math.sin(self.angle),
-                      - velocity_rel.x * math.sin(self.angle) + velocity_rel.y * math.cos(self.angle))
+        self.velocity = Vector(self.velocity_rel.x * math.cos(self.angle) + self.velocity_rel.y * math.sin(self.angle),
+                      - self.velocity_rel.x * math.sin(self.angle) + self.velocity_rel.y * math.cos(self.angle))
         self.rect.x += self.velocity.x; self.rect.y += self.velocity.y
 
         if self.rect.right > WIDTH:
@@ -96,10 +83,35 @@ class Player(pygame.sprite.Sprite):
         if self.rect.top < 0:
             self.rect.top = 0
 
-    def shoot(self):
-        bullet = Bullet(self.point_gun, self.angle)
-        all_sprites.add(bullet)
-        bullets.add(bullet)
+
+class Enemy(Mob):
+    def get_course(self, player_position):
+        player_vector = Vector(player_position.x - self.rect.centerx, player_position.y - self.rect.centery)
+        self.angle = math.atan(player_vector.y / player_vector.x);
+
+
+class Player(Mob):
+    def update(self):
+        self.velocity_rel = Vector(0, 0)
+        self.w = 0
+
+        keystate = pygame.key.get_pressed()
+        if keystate[pygame.K_LEFT]:
+            self.w = 5 * math.pi / 180
+        if keystate[pygame.K_RIGHT]:
+            self.w = -5 * math.pi / 180
+
+        if keystate[pygame.K_a]:
+            self.velocity_rel.x = -8
+        if keystate[pygame.K_d]:
+            self.velocity_rel.x = 8
+
+        if keystate[pygame.K_w]:
+            self.velocity_rel.y = -8
+        if keystate[pygame.K_s]:
+            self.velocity_rel.y = 8
+
+        super().move()
 
 
 
@@ -111,7 +123,7 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("My Game")
 clock = pygame.time.Clock()
 all_sprites = pygame.sprite.Group()
-player = Player()
+player = Player(Vector(WIDTH/2, HEIGHT/2), player_img)
 all_sprites.add(player)
 bullets = pygame.sprite.Group()
 
