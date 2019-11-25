@@ -1,12 +1,22 @@
 from random import randrange as rnd, choice
+import pygame
+import os
 
 
-root = tk.Tk()
-fr = tk.Frame(root)
-root.geometry('800x600')
-canv = tk.Canvas(root, bg='white')
-canv.pack(fill=tk.BOTH, expand=1)
-dt = 0.03
+WIDTH = 480
+HEIGHT = 600
+FPS = 60
+
+# Задаем цвета
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+RED = (255, 0, 0)
+GREEN = (0, 255, 0)
+BLUE = (0, 0, 255)
+YELLOW = (255, 255, 0)
+
+font_name = pygame.font.match_font('arial')
+
 LOCATIONS = dict()   # двухсторонний граф связей всех локаций, словарь вида
                 # LOCATIONS = {
                 #   локация: {
@@ -15,7 +25,7 @@ LOCATIONS = dict()   # двухсторонний граф связей всех
                 # }
 
 
-class Object:
+class Object(pygame.sprite.Sprite):
     """Дефолтный класс внутриигрового объекта.
     Все прочие классы (игрока, врагов, вещей и проч.)
     наследуют его функции."""
@@ -113,3 +123,77 @@ class Location:
     Объект, поведение и атаки которого определяется 
     одним из наперёд заданных алгоритмов
     и прощитывается компьпьютером."""
+
+
+# Создаем игру и окно
+pygame.init()
+pygame.mixer.init()
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("My Game")
+clock = pygame.time.Clock()
+
+# # настройка папки ассетов
+# game_folder = os.path.dirname(__file__)
+# img_dir = os.path.join(game_folder, 'img')
+# background = pygame.image.load(os.path.join(img_dir, 'background.png')).convert()
+# background_rect = background.get_rect()
+# player_img = pygame.image.load(os.path.join(img_dir, 'player.png')).convert()
+# enemy_images = []
+# enemy_list =[
+#     # названия тукстур врагов
+# ]
+# for img in enemy_list:
+#     enemy_images.append(pygame.image.load(os.path.join(img_dir, img)).convert())
+# bullet_img = pygame.image.load(os.path.join(img_dir, "laserRed16.png")).convert()
+
+# all_sprites = pygame.sprite.Group()
+# mobs = pygame.sprite.Group()
+# bullets = pygame.sprite.Group()
+# player = Player()
+# all_sprites.add(player)
+# for i in range(8):
+#     m = Mob()
+#     all_sprites.add(m)
+#     mobs.add(m)
+# score = 0
+
+# Цикл игры
+running = True
+while running:
+    # Держим цикл на правильной скорости
+    clock.tick(FPS)
+    # Ввод процесса (события)
+    for event in pygame.event.get():
+        # check for closing window
+        if event.type == pygame.QUIT:
+            running = False
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_SPACE:
+                # player.shoot()
+                pass
+
+    # # Обновление
+    # all_sprites.update()
+
+    # # Проверка, не ударил ли моб игрока
+    # hits = pygame.sprite.spritecollide(player, mobs, False, pygame.sprite.collide_circle)
+    # if hits:
+    #     running = False
+
+    # hits = pygame.sprite.groupcollide(mobs, bullets, True, True)
+    # for hit in hits:
+    #     score += 50 - hit.radius
+    #     m = Mob()
+    #     all_sprites.add(m)
+    #     mobs.add(m)
+
+    # Отрисовка
+    screen.fill(BLACK)
+    # screen.blit(background, background_rect)
+    # all_sprites.draw(screen)
+    # draw_text(screen, str(score), 18, WIDTH / 2, 10)
+
+    # После отрисовки всего, переворачиваем экран
+    pygame.display.flip()
+
+pygame.quit()
