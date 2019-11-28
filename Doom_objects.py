@@ -60,7 +60,7 @@ class Object(pygame.sprite.Sprite):
 
 
 class Bullet(pygame.sprite.Sprite):
-    def __init__(self, point, angle, image=bullet_img):
+    def __init__(self, point, angle, damage, image=bullet_img):
         pygame.sprite.Sprite.__init__(self)
         self.image = image
         self.angle = angle
@@ -70,6 +70,7 @@ class Bullet(pygame.sprite.Sprite):
         self.rect.centerx = point.x
         self.speed = 10
         self.velocity = Vector(- self.speed * math.sin(angle), - self.speed * math.cos(angle))
+        self.damage = damage
 
     def update(self):
         self.rect.centerx += self.velocity.x
@@ -97,14 +98,16 @@ class Mob(pygame.sprite.Sprite):
         self.hp = hp
 
     def shoot(self):
-        bullet = Bullet(self.gun_position, self.angle, bullet_img)
+        bullet = Bullet(self.gun_position, self.angle, 50, bullet_img)
         all_sprites.add(bullet)
         self.__class__.bullets.add(bullet)
 
     def check_bullet(self, bullets):
         hits = pygame.sprite.spritecollide(self, bullets, True)
-        if hits:
-            print(hits)
+        for hit in hits:
+            self.hp -= hit.damage
+        if self.hp <= 0:
+            self.kill()
 
     def move(self):
         self.angle += self.w
@@ -152,12 +155,12 @@ class Enemy(Mob):
 
         angle %= 2 * math.pi
 
-        if 0 < abs(angle - self.angle): # < self.angle_of_vision / 2:
+        if 0 < abs(angle - self.angle): # < self.angle_of_vision / 2: #Ограничение по углу так и не работает
             ret = False
             if not Enemy.invisible_bullets:
                 invisible_bullet = Bullet(self.gun_position, angle, invisible_bullet_img)
                 Enemy.invisible_bullets.add(invisible_bullet)
-                all_sprites.add(invisible_bullet)
+                all_sprites.add(invisible_bullet) #Стоит вообще не передавать ее всем спрайтам, чтобы не отрисовывалась
 
             #Теперь проверим, достигла ли невидимая пуля игрока
             else:
@@ -171,6 +174,7 @@ class Enemy(Mob):
     def update(self):
         self.move()
         self.check_bullet(Player.bullets)
+
 
 class Player(Mob):
     def update(self):
