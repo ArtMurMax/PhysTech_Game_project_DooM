@@ -8,6 +8,9 @@ WIDTH = 800
 HEIGHT = 650
 FPS = 60
 
+def str():
+    pass
+
 # Создаем игру и окно
 pygame.init()
 pygame.mixer.init()
@@ -15,9 +18,10 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("My Game")
 clock = pygame.time.Clock()
 player = Player(Vector(WIDTH/2, HEIGHT/2), player_img, 100)
+mobs.append(player)
 all_sprites.add(player)
-enemy = Enemy(Vector(200, 200), player_img, 360 * math.pi / 180, player, 100)
-all_sprites.add(enemy)
+mobs.append(Enemy(Vector(200, 200), player_img, 360 * math.pi / 180, player, 100, str))
+all_sprites.add(mobs[-1]) #Берем последний элемент
 
 
 # Цикл игры
@@ -35,8 +39,14 @@ while running:
                 player.shoot()
 
     # Обновление
-    enemy.get_course(player.position)
     all_sprites.update()
+
+    for mob in mobs:
+        if mob.hp <= 0:
+            all_sprites.remove(mob)
+            del mob
+            # continue
+
 
     # Рендеринг
     screen.fill(WHITE)
