@@ -8,8 +8,8 @@ WIDTH = 800
 HEIGHT = 650
 FPS = 60
 
-def str():
-    pass
+def str(self, angle):
+    self.angle = angle
 
 # Создаем игру и окно
 pygame.init()
@@ -20,7 +20,7 @@ clock = pygame.time.Clock()
 player = Player(Vector(WIDTH/2, HEIGHT/2), player_img, 100)
 mobs.append(player)
 all_sprites.add(player)
-mobs.append(Enemy(Vector(200, 200), player_img, 360 * math.pi / 180, player, 100, str))
+mobs.append(Enemy(Vector(200, 200), player_img, 180 * math.pi / 180, player, 100, str))
 all_sprites.add(mobs[-1]) #Берем последний элемент
 
 
@@ -40,13 +40,6 @@ while running:
 
     # Обновление
     all_sprites.update()
-
-    for mob in mobs:
-        if mob.hp <= 0:
-            all_sprites.remove(mob)
-            del mob
-            # continue
-
 
     # Рендеринг
     screen.fill(WHITE)
