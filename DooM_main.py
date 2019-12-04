@@ -2,7 +2,7 @@ import pygame
 import random
 import math
 import os
-from Doom_objects import *
+from DooM_objects import *
 
 WIDTH = 800
 HEIGHT = 650
