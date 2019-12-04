@@ -21,6 +21,7 @@ bullet_img = pygame.image.load(os.path.join(img_folder, 'bullet.png'))
 invisible_bullet_img = bullet_img #pygame.image.load(os.path.join(img_folder, 'invisible_bullet.png'))
 
 all_sprites = pygame.sprite.Group()
+mobs = []
 
 class Vector():
     def __init__(self, x, y):
@@ -36,6 +37,8 @@ class Vector():
     def __mul__(self, other):
         return self.x * other.x + self.y * other.y
 
+
+
 class Object(pygame.sprite.Sprite):
     def __init__(self, center, image, list_active_acts=[], list_passive_act=[]):
         pygame.sprite.Sprite.__init__(self)
@@ -46,11 +49,13 @@ class Object(pygame.sprite.Sprite):
         self.list_active_acts = list_active_acts
         self.list_passive_acts = list_passive_act
 
+
     def passive_act(self):
         keystate = pygame.key.get_pressed()
         if keystate[pygame.K_f]:
             for func in self.list_passive_acts:
                 func()
+
 
     def active_act(self):
         keystate = pygame.key.get_pressed()
@@ -59,18 +64,20 @@ class Object(pygame.sprite.Sprite):
                 func()
 
 
+
 class Bullet(pygame.sprite.Sprite):
     def __init__(self, point, angle, damage, image=bullet_img):
         pygame.sprite.Sprite.__init__(self)
         self.image = image
         self.angle = angle
-        self.image = pygame.transform.rotate(self.image, int(self.angle * 180 / math.pi))
+        self.image = pygame.transform.rotate(self.image, int((-self.angle - math.pi/2) * 180 / math.pi))
         self.rect = self.image.get_rect()
         self.rect.centery = point.y
         self.rect.centerx = point.x
         self.speed = 10
-        self.velocity = Vector(- self.speed * math.sin(angle), - self.speed * math.cos(angle))
+        self.velocity = Vector(self.speed * math.cos(angle), self.speed * math.sin(angle))
         self.damage = damage
+
 
     def update(self):
         self.rect.centerx += self.velocity.x
@@ -81,8 +88,10 @@ class Bullet(pygame.sprite.Sprite):
 
 
 class Mob(pygame.sprite.Sprite):
-    bullets = pygame.sprite.Group()
-
+    '''
+    Общий класс для всех мобов
+    angle ∈ [0; 2*pi)
+    '''
     def __init__(self, position, image, hp):
         pygame.sprite.Sprite.__init__(self)
         self.position = position
@@ -90,17 +99,19 @@ class Mob(pygame.sprite.Sprite):
         self.image = self.original_image
         self.rect = self.image.get_rect()
         self.rect.center = (self.position.x, self.position.y)
-        self.angle = 0
-        self.vector_gun_start = Vector(0, self.rect.top - self.rect.centery)
+        self.angle = 3/2*math.pi
+        self.vector_gun_start = Vector(self.rect.right - self.rect.centerx, 0)
         self.velocity_rel = Vector(0, 0)
         self.gun_position = self.vector_gun_start + Vector(self.rect.centerx, self.rect.centery)
         self.w = 0
         self.hp = hp
 
+
     def shoot(self):
         bullet = Bullet(self.gun_position, self.angle, 50, bullet_img)
         all_sprites.add(bullet)
         self.__class__.bullets.add(bullet)
+
 
     def check_bullet(self, bullets):
         hits = pygame.sprite.spritecollide(self, bullets, True)
@@ -109,18 +120,18 @@ class Mob(pygame.sprite.Sprite):
         if self.hp <= 0:
             self.kill()
 
+
     def move(self):
         self.angle += self.w
-        self.angle %= 2 * math.pi
-        self.image = pygame.transform.rotate(self.original_image, int(self.angle * 180 / math.pi))
+        self.angle %= (2*math.pi)
+        self.image = pygame.transform.rotate(self.original_image, int((-self.angle - math.pi/2) * 180 / math.pi))
         self.rect = self.image.get_rect(center=self.rect.center)
-        self.position.x = self.rect.centerx; self.position.y = self.rect.centery
-        self.gun_position.x = self.vector_gun_start.x * math.cos(self.angle) + self.vector_gun_start.y * math.sin(self.angle) + self.rect.centerx
-        self.gun_position.y = - self.vector_gun_start.x * math.sin(self.angle) + self.vector_gun_start.y * math.cos(self.angle) + self.rect.centery
+        self.gun_position.x = self.vector_gun_start.x * math.cos(self.angle) - self.vector_gun_start.y * math.sin(self.angle) + self.rect.centerx
+        self.gun_position.y = self.vector_gun_start.x * math.sin(self.angle) + self.vector_gun_start.y * math.cos(self.angle) + self.rect.centery
 
-        self.velocity = Vector(self.velocity_rel.x * math.cos(self.angle) + self.velocity_rel.y * math.sin(self.angle),
-                      - self.velocity_rel.x * math.sin(self.angle) + self.velocity_rel.y * math.cos(self.angle))
-        self.position += self.velocity
+        self.velocity = Vector(self.velocity_rel.x * math.cos(self.angle) - self.velocity_rel.y * math.sin(self.angle),
+                      self.velocity_rel.x * math.sin(self.angle) + self.velocity_rel.y * math.cos(self.angle))
+        self.position = self.position + self.velocity
         self.rect.centerx = self.position.x; self.rect.centery = self.position.y
 
         if self.rect.right > WIDTH:
@@ -133,69 +144,74 @@ class Mob(pygame.sprite.Sprite):
             self.rect.top = 0
 
 
+
 class Enemy(Mob):
-    def __init__(self, point, image, angle_of_vision, player, hp):
-        super().__init__(point, image, hp )
+    bullets = pygame.sprite.Group()
+
+    def __init__(self, point, image, angle_of_vision, player, hp, strategy):
+        super().__init__(point, image, hp)
         self.angle_of_vision = angle_of_vision
         self.player_position = point
         self.player = player
+        self.strategy = strategy
         Enemy.invisible_bullets = pygame.sprite.Group()
 
 
-    def get_course(self, player_position):
-        player_vector = player_position - self.gun_position
-        if player_vector.y < 0:
-            angle = math.atan(player_vector.x / player_vector.y)
-        elif player_vector.y == 0 and player_vector.x > 0:
-            angle = -math.pi / 2
-        elif player_vector.y == 0 and player_vector.x < 0:
-            angle = math.pi / 2
-        else:
-            angle = math.pi + math.atan(player_vector.x / player_vector.y)
+    def check_vision(self):
+        player_vector = self.player.position - self.gun_position
+        angle = math.atan2(player_vector.y, player_vector.x) % (2*math.pi)
 
-        angle %= 2 * math.pi
-
-        if 0 < abs(angle - self.angle): # < self.angle_of_vision / 2: #Ограничение по углу так и не работает
-            ret = False
+        vision = False
+        if self.angle - angle < 1E-3:
+            vision = True
+        elif (self.angle + self.angle_of_vision / 2) % (2*math.pi) > angle or (self.angle - self.angle_of_vision / 2) % (2*math.pi) < angle:
             if not Enemy.invisible_bullets:
                 invisible_bullet = Bullet(self.gun_position, angle, invisible_bullet_img)
                 Enemy.invisible_bullets.add(invisible_bullet)
-                all_sprites.add(invisible_bullet) #Стоит вообще не передавать ее всем спрайтам, чтобы не отрисовывалась
+                all_sprites.add(
+                    invisible_bullet)  # Стоит вообще не передавать ее всем спрайтам, чтобы не отрисовывалась
 
-            #Теперь проверим, достигла ли невидимая пуля игрока
+            # Теперь проверим, достигла ли невидимая пуля игрока
             else:
                 hits = pygame.sprite.spritecollide(self.player, Enemy.invisible_bullets, True)
                 if hits:
-                    self.angle = angle
-                    ret = True
+                    vision = True
 
-            return ret
+        return vision, angle
+
 
     def update(self):
-        self.move()
         self.check_bullet(Player.bullets)
+        vision, angle = self.check_vision()
+        if vision:
+            self.strategy(self, angle)
+        self.move()
+
 
 
 class Player(Mob):
+    bullets = pygame.sprite.Group()
+
+
     def update(self):
         self.velocity_rel = Vector(0, 0)
         self.w = 0
 
         keystate = pygame.key.get_pressed()
         if keystate[pygame.K_LEFT]:
-            self.w = 5 * math.pi / 180
-        if keystate[pygame.K_RIGHT]:
             self.w = -5 * math.pi / 180
+        if keystate[pygame.K_RIGHT]:
+            self.w = 5 * math.pi / 180
 
         if keystate[pygame.K_a]:
-            self.velocity_rel.x = -8
+            self.velocity_rel.y = -2
         if keystate[pygame.K_d]:
-            self.velocity_rel.x = 8
+            self.velocity_rel.y = 2
 
         if keystate[pygame.K_w]:
-            self.velocity_rel.y = -8
+            self.velocity_rel.x = 2
         if keystate[pygame.K_s]:
-            self.velocity_rel.y = 8
+            self.velocity_rel.x = -2
 
         super().move()
-        # self.check_bullet(Enemy.bullets)
+        self.check_bullet(Enemy.bullets)
