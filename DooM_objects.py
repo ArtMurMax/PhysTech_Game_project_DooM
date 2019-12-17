@@ -1,3 +1,4 @@
+from DooM_consts import *
 import pygame
 import os
 import math
@@ -18,10 +19,16 @@ YELLOW = (255, 255, 0)
 game_folder = os.path.dirname(__file__)
 img_folder = os.path.join(game_folder, 'img')
 locations_folder = os.path.join(img_folder, 'room2')
-player_img = pygame.transform.scale(pygame.image.load(os.path.join(img_folder, 'player_s.png')), (51, 78))
+player_folder = os.path.join(img_folder, 'player')
+player_move_folder = os.path.join(player_folder, 'move')
+player_reload_folder = os.path.join(player_folder, 'reload')
 bullet_img = pygame.transform.scale(pygame.image.load(os.path.join(img_folder, 'bullet.png')), (5, 16))
 invisible_bullet_img = bullet_img #pygame.image.load(os.path.join(img_folder, 'invisible_bullet.png'))
 locations_imgs = [pygame.image.load(os.path.join(locations_folder, 'room00%02i.png' % (i))) for i in range(16)]
+pygame.mixer.init()
+snd_dir = os.path.join(game_folder, 'snd')
+snd_shoot = pygame.mixer.Sound(os.path.join(snd_dir, 'shotgun_shot.wav'))
+snd_reload = pygame.mixer.Sound(os.path.join(snd_dir, 'shotgun_reload.wav'))
 
 all_sprites = pygame.sprite.Group()
 mobs = []
@@ -39,6 +46,30 @@ class Vector():
 
     def __mul__(self, other):
         return self.x * other.x + self.y * other.y
+
+def animation(obj, imgs, speed, cyclic, from_begin=False):
+    '''Процедура анимирует объекты
+    obj - объект
+    imgs - список его изображений
+    speed - раз в сколько кадров обновлять
+    cycic - цикличная ли анимация
+    from_begin - начать анимацию заново'''
+    end = False;
+
+    if from_begin:
+        obj.img_number = 0
+    if time() - obj.time_last_img_upd >= speed / FPS:
+        obj.time_last_img_upd = time()
+        obj.img_number += 1
+        if obj.img_number >= len(imgs):
+            if cyclic:
+                obj.img_number = 0
+            else:
+                end = True;
+        if obj.img_number < len(imgs):
+            obj.original_image = imgs[obj.img_number]
+
+    return end
 
 
 class Object(pygame.sprite.Sprite):
@@ -92,26 +123,38 @@ class Mob(pygame.sprite.Sprite):
     Общий класс для всех мобов
     angle ∈ [0; 2*pi)
     '''
-    def __init__(self, position, image, hp, *, location='surface', velocity=[0 ,0], reload_time=0.4):
+    def __init__(self, position, hp, *, gun_type='shotgun', location='surface', velocity=[0 ,0], reload_time=0.4):
         pygame.sprite.Sprite.__init__(self)
         self.position = position
-        self.original_image = self.image = image
-        self.image = self.original_image
+        self.gun_type = gun_type
+        self.imgs = [pygame.transform.scale(pygame.image.load(os.path.join(player_move_folder,
+                    'survivor-move_%s_%i.png' % (self.gun_type, i))), (51, 51)) for i in range(20)]
+        self.img_reload = [pygame.transform.scale(pygame.image.load(os.path.join(player_reload_folder,
+                    'survivor-reload_%s_%i.png' % (self.gun_type, i))), (51, 51)) for i in range(20)]
+        self.original_image = self.image = self.imgs[0]
         self.rect = self.image.get_rect()
         self.rect.center = (self.position.x, self.position.y)
         self.angle = 3/2*math.pi
-        self.vector_gun_start = Vector((self.rect.right - self.rect.centerx), -(self.rect.top - self.rect.centery) * 3 / 10)
+        self.vector_gun_start = Vector((self.rect.right - self.rect.centerx), -(self.rect.top - self.rect.centery) * 5 / 10)
         self.velocity_rel = Vector(0, 0)
         self.gun_position = self.vector_gun_start + Vector(self.rect.centerx, self.rect.centery)
         self.w = 0
         self.hp = hp
         self.reload_time = reload_time
         self.last_shoot_time = time()
+        self.time_last_img_upd = time()
+        self.img_number = 0
+        self.shooting = False
+        self.shots = 0
+        self.first_for_sound = True
 
     def shoot(self):
+        self.shooting = True
+        self.shots += 1
         bullet = Bullet(self.gun_position, self.angle, 50, bullet_img)
         all_sprites.add(bullet)
         self.__class__.bullets.add(bullet)
+        snd_shoot.play()
 
     def check_bullet(self, bullets):
         hits = pygame.sprite.spritecollide(self, bullets, True)
@@ -123,31 +166,47 @@ class Mob(pygame.sprite.Sprite):
     def move(self):
         self.angle += self.w
         self.angle %= (2*math.pi)
-        self.image = pygame.transform.rotate(self.original_image, int((-self.angle - math.pi/2) * 180 / math.pi))
+        self.image = pygame.transform.rotate(self.original_image, int((-self.angle) * 180 / math.pi))
         self.rect = self.image.get_rect(center=self.rect.center)
         self.gun_position.x = self.vector_gun_start.x * math.cos(self.angle) - self.vector_gun_start.y * math.sin(self.angle) + self.rect.centerx
         self.gun_position.y = self.vector_gun_start.x * math.sin(self.angle) + self.vector_gun_start.y * math.cos(self.angle) + self.rect.centery
 
-        self.velocity = Vector(self.velocity_rel.x * math.cos(self.angle) - self.velocity_rel.y * math.sin(self.angle),
-                      self.velocity_rel.x * math.sin(self.angle) + self.velocity_rel.y * math.cos(self.angle))
-        self.position = self.position + self.velocity
-        self.rect.centerx = self.position.x; self.rect.centery = self.position.y
+        if self.shooting and self.shots >= 5:
+            if self.first_for_sound:
+                snd_reload.play()
+                self.first_for_sound = False;
+            is_end = animation(self, self.img_reload, self.reload_time * FPS / len(self.img_reload), False)
+            if is_end:
+                self.first_for_sound = True;
+                self.shots = 0
+                self.shooting = False
+                self.img_number = 0
 
-        if self.rect.right > WIDTH:
-            self.rect.right = WIDTH
-        if self.rect.left < 0:
-            self.rect.left = 0
-        if self.rect.bottom > HEIGHT:
-            self.rect.bottom = HEIGHT
-        if self.rect.top < 0:
-            self.rect.top = 0
+        elif self.velocity_rel.x or self.velocity_rel.y:
+            self.velocity = Vector(self.velocity_rel.x * math.cos(self.angle) - self.velocity_rel.y * math.sin(self.angle),
+                          self.velocity_rel.x * math.sin(self.angle) + self.velocity_rel.y * math.cos(self.angle))
+            self.position = self.position + self.velocity
+            self.rect.centerx = self.position.x; self.rect.centery = self.position.y
+
+            if self.rect.right > WIDTH:
+                self.rect.right = WIDTH
+            if self.rect.left < 0:
+                self.rect.left = 0
+            if self.rect.bottom > HEIGHT:
+                self.rect.bottom = HEIGHT
+            if self.rect.top < 0:
+                self.rect.top = 0
+
+            animation(self, self.imgs, 1, True)
+            self.shooting = False;
+
 
 
 class Enemy(Mob):
     bullets = pygame.sprite.Group()
 
-    def __init__(self, point, image, angle_of_vision, player, hp, strategy, *, location='surface'):
-        super().__init__(point, image, hp)
+    def __init__(self, point, angle_of_vision, player, hp, strategy, *, location='surface'):
+        super().__init__(point, hp)
         self.angle_of_vision = angle_of_vision
         self.player_position = point
         self.player = player
@@ -199,14 +258,14 @@ class Player(Mob):
             self.w = 5 * math.pi / 180
 
         if keystate[pygame.K_a]:
-            self.velocity_rel.y = -2
+            self.velocity_rel.y = -1
         if keystate[pygame.K_d]:
-            self.velocity_rel.y = 2
+            self.velocity_rel.y = 1
 
         if keystate[pygame.K_w]:
-            self.velocity_rel.x = 2
+            self.velocity_rel.x = 1
         if keystate[pygame.K_s]:
-            self.velocity_rel.x = -2
+            self.velocity_rel.x = -1
 
         super().move()
         self.check_bullet(Enemy.bullets)

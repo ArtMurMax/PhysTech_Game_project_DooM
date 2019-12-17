@@ -1,3 +1,4 @@
+from DooM_consts import *
 import pygame
 import random
 import math
@@ -5,24 +6,20 @@ import os
 from time import time
 from DooM_objects import *
 
-WIDTH = 800
-HEIGHT = 650
-FPS = 60
-
 def str(self, angle):
     self.angle = angle
 
 # Создаем игру и окно
 pygame.init()
-pygame.mixer.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("My Game")
 clock = pygame.time.Clock()
-player = Player(Vector(WIDTH/2, HEIGHT/2), player_img, 100)
+player = Player(Vector(WIDTH/2, HEIGHT/2), 100, gun_type='shotgun')
 mobs.append(player)
 all_sprites.add(player)
-mobs.append(Enemy(Vector(200, 200), player_img, 180 * math.pi / 180, player, 100, str))
+mobs.append(Enemy(Vector(200, 200), 180 * math.pi / 180, player, 100, str))
 all_sprites.add(mobs[-1]) #Берем последний элемент
+
 
 
 # Цикл игры
