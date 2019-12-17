@@ -2,6 +2,7 @@ import pygame
 import random
 import math
 import os
+from time import time
 from DooM_objects import *
 
 WIDTH = 800
@@ -35,8 +36,9 @@ while running:
         if event.type == pygame.QUIT:
             running = False
         elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_SPACE:
+            if event.key == pygame.K_SPACE and time() - player.last_shoot_time > player.reload_time:
                 player.shoot()
+                player.last_shoot_time = time()
 
     # Обновление
     all_sprites.update()

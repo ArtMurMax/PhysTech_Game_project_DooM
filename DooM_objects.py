@@ -1,6 +1,7 @@
 import pygame
 import os
 import math
+from time import time
 
 WIDTH = 800
 HEIGHT = 650
@@ -16,9 +17,11 @@ YELLOW = (255, 255, 0)
 
 game_folder = os.path.dirname(__file__)
 img_folder = os.path.join(game_folder, 'img')
-player_img = pygame.image.load(os.path.join(img_folder, 'player.png'))
-bullet_img = pygame.image.load(os.path.join(img_folder, 'bullet.png'))
+locations_folder = os.path.join(img_folder, 'room2')
+player_img = pygame.transform.scale(pygame.image.load(os.path.join(img_folder, 'player_s.png')), (51, 78))
+bullet_img = pygame.transform.scale(pygame.image.load(os.path.join(img_folder, 'bullet.png')), (5, 16))
 invisible_bullet_img = bullet_img #pygame.image.load(os.path.join(img_folder, 'invisible_bullet.png'))
+locations_imgs = [pygame.image.load(os.path.join(locations_folder, 'room00%02i.png' % (i))) for i in range(16)]
 
 all_sprites = pygame.sprite.Group()
 mobs = []
@@ -38,9 +41,9 @@ class Vector():
         return self.x * other.x + self.y * other.y
 
 
-
 class Object(pygame.sprite.Sprite):
-    def __init__(self, center, image, list_active_acts=[], list_passive_act=[]):
+
+    def __init__(self, center, image, list_active_acts=[], list_passive_act=[], *, location='surface'):
         pygame.sprite.Sprite.__init__(self)
         self.original_image = image
         self.image = self.original_image
@@ -49,13 +52,11 @@ class Object(pygame.sprite.Sprite):
         self.list_active_acts = list_active_acts
         self.list_passive_acts = list_passive_act
 
-
     def passive_act(self):
         keystate = pygame.key.get_pressed()
         if keystate[pygame.K_f]:
             for func in self.list_passive_acts:
                 func()
-
 
     def active_act(self):
         keystate = pygame.key.get_pressed()
@@ -64,9 +65,9 @@ class Object(pygame.sprite.Sprite):
                 func()
 
 
-
 class Bullet(pygame.sprite.Sprite):
-    def __init__(self, point, angle, damage, image=bullet_img):
+
+    def __init__(self, point, angle, damage, image=bullet_img, *, location='surface'):
         pygame.sprite.Sprite.__init__(self)
         self.image = image
         self.angle = angle
@@ -77,7 +78,6 @@ class Bullet(pygame.sprite.Sprite):
         self.speed = 10
         self.velocity = Vector(self.speed * math.cos(angle), self.speed * math.sin(angle))
         self.damage = damage
-
 
     def update(self):
         self.rect.centerx += self.velocity.x
@@ -92,26 +92,26 @@ class Mob(pygame.sprite.Sprite):
     Общий класс для всех мобов
     angle ∈ [0; 2*pi)
     '''
-    def __init__(self, position, image, hp):
+    def __init__(self, position, image, hp, *, location='surface', velocity=[0 ,0], reload_time=0.4):
         pygame.sprite.Sprite.__init__(self)
         self.position = position
-        self.original_image = image
+        self.original_image = self.image = image
         self.image = self.original_image
         self.rect = self.image.get_rect()
         self.rect.center = (self.position.x, self.position.y)
         self.angle = 3/2*math.pi
-        self.vector_gun_start = Vector(self.rect.right - self.rect.centerx, 0)
+        self.vector_gun_start = Vector((self.rect.right - self.rect.centerx), -(self.rect.top - self.rect.centery) * 3 / 10)
         self.velocity_rel = Vector(0, 0)
         self.gun_position = self.vector_gun_start + Vector(self.rect.centerx, self.rect.centery)
         self.w = 0
         self.hp = hp
-
+        self.reload_time = reload_time
+        self.last_shoot_time = time()
 
     def shoot(self):
         bullet = Bullet(self.gun_position, self.angle, 50, bullet_img)
         all_sprites.add(bullet)
         self.__class__.bullets.add(bullet)
-
 
     def check_bullet(self, bullets):
         hits = pygame.sprite.spritecollide(self, bullets, True)
@@ -119,7 +119,6 @@ class Mob(pygame.sprite.Sprite):
             self.hp -= hit.damage
         if self.hp <= 0:
             self.kill()
-
 
     def move(self):
         self.angle += self.w
@@ -144,11 +143,10 @@ class Mob(pygame.sprite.Sprite):
             self.rect.top = 0
 
 
-
 class Enemy(Mob):
     bullets = pygame.sprite.Group()
 
-    def __init__(self, point, image, angle_of_vision, player, hp, strategy):
+    def __init__(self, point, image, angle_of_vision, player, hp, strategy, *, location='surface'):
         super().__init__(point, image, hp)
         self.angle_of_vision = angle_of_vision
         self.player_position = point
@@ -156,13 +154,12 @@ class Enemy(Mob):
         self.strategy = strategy
         Enemy.invisible_bullets = pygame.sprite.Group()
 
-
     def check_vision(self):
         player_vector = self.player.position - self.gun_position
         angle = math.atan2(player_vector.y, player_vector.x) % (2*math.pi)
 
         vision = False
-        if self.angle - angle < 1E-3:
+        if self.angle - angle < 1E-4:
             vision = True
         elif (self.angle + self.angle_of_vision / 2) % (2*math.pi) > angle or (self.angle - self.angle_of_vision / 2) % (2*math.pi) < angle:
             if not Enemy.invisible_bullets:
@@ -179,14 +176,12 @@ class Enemy(Mob):
 
         return vision, angle
 
-
     def update(self):
         self.check_bullet(Player.bullets)
         vision, angle = self.check_vision()
         if vision:
             self.strategy(self, angle)
         self.move()
-
 
 
 class Player(Mob):
@@ -215,3 +210,63 @@ class Player(Mob):
 
         super().move()
         self.check_bullet(Enemy.bullets)
+
+
+class Portal(pygame.sprite.Sprite):
+
+    def __init__(self, points, *, thickness=2, location='surface'):
+        pygame.sprite.Sprite.__init__(self)
+        if points[0][0] == points[1][0]:
+            self.image = pygame.Surface((thickness, abs(points[0][1] - points[1][1]) // 2))
+            self.rect = self.image.get_rect()
+            self.rect.center = (center.x, center.y)
+        else:
+            self.image = pygame.Surface((abs(points[0][0] - points[1][0]) // 2, thickness))
+            self.rect = self.image.get_rect()
+            self.rect.center = (abs(points[0][0] + points[1][0]) // 2, abs(points[0][1] + points[1][1]) // 2)
+
+
+class Location:
+    """Класс локации (комнаты).
+            Это - сцена для объектов всей игры,
+            вне локаций - зона уничтожения объектов."""
+
+    LOCATIONS = dict()  # двухсторонний граф связей всех локаций, словарь вида
+    # LOCATIONS = {
+    #   локация: {
+    #           название соседней локации: [вершины, задающие переход между локациями]
+    #           }
+    # }
+
+
+    def __init__(self, *, coords=None, color=None, image=None, max_velocity=[100, 100], owners=dict()):
+        if coords is None:
+            raise TypeError
+        self.coords = coords
+        if id is not None:
+            self.id = id
+        else:
+            self.color = color if color is not None else choice(['grey', 'white', 'orange', 'brown'])
+            self.id = canv.create_polygon(coords, fill=self.color)
+        self.max_vel = max_velocity
+        LOCATIONS[self] = owners
+        for loc in owners:
+            LOCATIONS[loc][self] = owners[loc]
+        # self.walls =
+        # self.doors =
+        # self.guests =
+
+    def is_included(self, object):
+        """Артибут проверки того,
+        что локация содержит данный объект."""
+        return False
+
+    def was_changed(self, object):
+        """Атрибут проверки того,
+        что данный объект изменил свою локацию после движения."""
+        return object.l
+
+    def is_connected(self, location):
+        """Атрибут проверки того,
+        что две локации соединены переходом."""
+        return False
