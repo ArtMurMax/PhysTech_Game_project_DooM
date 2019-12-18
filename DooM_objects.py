@@ -5,6 +5,7 @@ import math
 from time import time
 import random
 
+font_name = pygame.font.match_font('arial')
 game_folder = os.path.dirname(__file__)
 img_folder = os.path.join(game_folder, 'img')
 locations_folder = os.path.join(img_folder, 'room2')
@@ -23,15 +24,13 @@ def medkit_passive_act():
 list_medkit_passive_act = []
 medkits = pygame.sprite.Group()
 
-global all_sprites, mobs, portals, BACKGROUND, background_rect
+global all_sprites, mobs, portals, BACKGROUND, background_rect, score
 
 all_sprites = pygame.sprite.Group()
 mobs = []
 portals = []
 PR_LOC = START
 
-def str(self, angle):
-    self.angle = angle
 
 def str_zombie(self):
     vision, angle = self.check_vision()
@@ -48,6 +47,24 @@ def str_zombie(self):
         self.velocity_rel.x = 0
     else:
         self.velocity_rel.x = 0
+
+def draw_text(surf, text, size, x, y):
+    font = pygame.font.Font(font_name, size)
+    text_surface = font.render(text, True, WHITE)
+    text_rect = text_surface.get_rect()
+    text_rect.midtop = (x, y)
+    surf.blit(text_surface, text_rect)
+
+def draw_shield_bar(surf, x, y, pct):
+    if pct < 0:
+        pct = 0
+    BAR_LENGTH = 100
+    BAR_HEIGHT = 10
+    fill = (pct / 100) * BAR_LENGTH
+    outline_rect = pygame.Rect(x, y, BAR_LENGTH, BAR_HEIGHT)
+    fill_rect = pygame.Rect(x, y, fill, BAR_HEIGHT)
+    pygame.draw.rect(surf, GREEN, fill_rect)
+    pygame.draw.rect(surf, WHITE, outline_rect, 2)
 
 class Vector():
     def __init__(self, x, y):
@@ -73,7 +90,7 @@ def animation(obj, imgs, frame_time, cyclic, from_begin=False):
     frame_time - раз в сколько кадров обновлять
     cycic - цикличная ли анимация
     from_begin - начать анимацию заново'''
-    end = False;
+    end = False
 
     if from_begin:
         obj.img_number = 0
@@ -84,7 +101,7 @@ def animation(obj, imgs, frame_time, cyclic, from_begin=False):
             if cyclic:
                 obj.img_number = 0
             else:
-                end = True;
+                end = True
         if obj.img_number < len(imgs):
             obj.original_image = imgs[obj.img_number]
 
@@ -121,8 +138,7 @@ class Bullet(pygame.sprite.Sprite):
         self.angle = angle
         self.image = pygame.transform.rotate(self.image, int((-self.angle - math.pi/2) * 180 / math.pi))
         self.rect = self.image.get_rect()
-        self.rect.centery = point.y
-        self.rect.centerx = point.x
+        self.rect.centery, self.rect.centerx = point.y, point.x
         self.speed = 10
         self.velocity = Vector(self.speed * math.cos(angle), self.speed * math.sin(angle))
         self.damage = damage
@@ -191,6 +207,7 @@ class Mob(pygame.sprite.Sprite):
             self.hp -= hit.damage
         if self.hp <= 0:
             self.kill()
+            LOCATIONS[PR_LOC][-1] -= 1
 
     def move(self):
         self.angle += self.w

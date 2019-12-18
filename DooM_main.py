@@ -41,6 +41,8 @@ while running:
     # Рендеринг
     screen.fill(BLACK)
     screen.blit(player.BACKGROUND, player.background_rect)
+    #draw_text(screen, str(score), 18, WIDTH / 2, 10)
+    draw_shield_bar(screen, 5, 5, player.hp)
     all_sprites.draw(screen)
     # После отрисовки всего, переворачиваем экран
     pygame.display.flip()
