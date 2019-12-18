@@ -247,15 +247,15 @@ class Enemy(Mob):
 
         vision = False
         if (self.angle + self.angle_of_vision / 2) % (2*math.pi) > angle or (self.angle - self.angle_of_vision / 2) % (2*math.pi) < angle:
-            if not Enemy.invisible_bullets and abs(self.player_vector) < self.r_of_vision:
+            if not self.invisible_bullets and abs(self.player_vector) < self.r_of_vision:
                 invisible_bullet = Bullet(self.gun_position, angle, invisible_bullet_img)
-                Enemy.invisible_bullets.add(invisible_bullet)
+                self.invisible_bullets.add(invisible_bullet)
                 all_sprites.add(
                     invisible_bullet)  # Стоит вообще не передавать ее всем спрайтам, чтобы не отрисовывалась
 
             # Теперь проверим, достигла ли невидимая пуля игрока
             else:
-                hits = pygame.sprite.spritecollide(self.player, Enemy.invisible_bullets, True)
+                hits = pygame.sprite.spritecollide(self.player, self.invisible_bullets, True)
                 if hits:
                     vision = True
 
