@@ -19,9 +19,6 @@ snd_dir = os.path.join(game_folder, 'snd')
 snd_shoot = pygame.mixer.Sound(os.path.join(snd_dir, 'shotgun_shot.wav'))
 snd_reload = pygame.mixer.Sound(os.path.join(snd_dir, 'shotgun_reload.wav'))
 snd_zombie = pygame.mixer.Sound(os.path.join(snd_dir, 'zombie_attack.wav'))
-def medkit_passive_act():
-    self.hp += 20
-list_medkit_passive_act = []
 medkits = pygame.sprite.Group()
 
 global all_sprites, mobs, portals, BACKGROUND, background_rect, score
@@ -121,7 +118,7 @@ class Object(pygame.sprite.Sprite):
 
     def passive_act(self):
         for func in self.list_passive_acts:
-            func()
+            func(player)
 
     def active_act(self):
         keystate = pygame.key.get_pressed()
@@ -328,7 +325,7 @@ class Player(Mob):
 
         hits = pygame.sprite.spritecollide(self, medkits, True)
         for hit in hits:
-            hit.passive_act()
+            self.hp += 20;
 
     def change_location(self, new_loc, portal):
         '''Функция, осуществляющая смену локации.'''
@@ -363,7 +360,7 @@ class Player(Mob):
         for i in range(LOCATIONS[new_loc][-1]):
             mobs.append(Enemy('skeleton', Vector(random.randint(LEFT, RIGHT), random.randint(TOP, BOTTOM)), 180 * (random.random()) * math.pi / 180, self, 100, str_zombie, 16, r_of_vision=300))
             all_sprites.add(mobs[-1])
-        medkit = Object(Vector(random.randint(LEFT, RIGHT), random.randint(TOP, BOTTOM)), medkit_img, list_passive_act=list_medkit_passive_act)
+        medkit = Object(Vector(random.randint(LEFT, RIGHT), random.randint(TOP, BOTTOM)), medkit_img)
         all_sprites.add(medkit)
         medkits.add(medkit)
 
