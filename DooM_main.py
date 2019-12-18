@@ -5,7 +5,10 @@ import math
 import os
 from time import time
 from DooM_objects import *
-import random
+
+
+def str(self, angle):
+    self.angle = angle
 
 def str_zombie(self):
     vision, angle = self.check_vision()
@@ -34,7 +37,7 @@ all_sprites.add(player)
 mobs.append(Enemy('skeleton', Vector(200, 200), 180 * math.pi / 180, player, 100, str_zombie, 16, r_of_vision=300))
 all_sprites.add(mobs[-1]) #Берем последний элемент
 
-
+player.change_location(START, 0)
 
 # Цикл игры
 running = True
@@ -57,7 +60,8 @@ while running:
     all_sprites.update()
 
     # Рендеринг
-    screen.fill(WHITE)
+    screen.fill(BLACK)
+    screen.blit(player.BACKGROUND, player.background_rect)
     all_sprites.draw(screen)
     # После отрисовки всего, переворачиваем экран
     pygame.display.flip()

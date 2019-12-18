@@ -6,8 +6,13 @@ from time import time
 import random
 
 WIDTH = 800
-HEIGHT = 650
+HEIGHT = 600
 FPS = 60
+
+TOP = 60
+BOTTOM = 540
+RIGHT = 710
+LEFT = 90
 
 # Задаем цвета
 WHITE = (255, 255, 255)
@@ -30,8 +35,12 @@ snd_shoot = pygame.mixer.Sound(os.path.join(snd_dir, 'shotgun_shot.wav'))
 snd_reload = pygame.mixer.Sound(os.path.join(snd_dir, 'shotgun_reload.wav'))
 snd_zombie = pygame.mixer.Sound(os.path.join(snd_dir, 'zombie_attack.wav'))
 
+global all_sprites, mobs, portals, BACKGROUND, background_rect
+
 all_sprites = pygame.sprite.Group()
 mobs = []
+portals = []
+PR_LOC = START
 
 class Vector():
     def __init__(self, x, y):
@@ -117,7 +126,7 @@ class Bullet(pygame.sprite.Sprite):
         self.rect.centerx += self.velocity.x
         self.rect.centery += self.velocity.y
         # убить, если он заходит за границу экрана
-        if self.rect.bottom < 0 or self.rect.top > HEIGHT or self.rect.right < 0 or self.rect.left > WIDTH:
+        if self.rect.bottom > BOTTOM or self.rect.top < TOP or self.rect.right > RIGHT or self.rect.left < LEFT:
             self.kill()
 
 
@@ -126,7 +135,7 @@ class Mob(pygame.sprite.Sprite):
     Общий класс для всех мобов
     angle ∈ [0; 2*pi)
     '''
-    def __init__(self, position, hp, image_number, *, gun_type='', location='surface', velocity=[0 ,0], reload_time=0.4):
+    def __init__(self, position, hp, image_number, *, gun_type='', location='surface', velocity=[0 ,0], reload_time=0.8):
         pygame.sprite.Sprite.__init__(self)
         self.position = position
         self.gun_type = gun_type
@@ -203,19 +212,19 @@ class Mob(pygame.sprite.Sprite):
             self.position = self.position + self.velocity
             self.rect.centerx = self.position.x; self.rect.centery = self.position.y
 
-            if self.rect.right > WIDTH:
-                self.rect.right = WIDTH
-            if self.rect.left < 0:
-                self.rect.left = 0
-            if self.rect.bottom > HEIGHT:
-                self.rect.bottom = HEIGHT
-            if self.rect.top < 0:
-                self.rect.top = 0
+            if self.rect.right > RIGHT:
+                self.rect.right = RIGHT
+            if self.rect.left < LEFT:
+                self.rect.left = LEFT
+            if self.rect.bottom > BOTTOM:
+                self.rect.bottom = BOTTOM
+            if self.rect.top < TOP:
+                self.rect.top = TOP
 
-            animation(self, self.img_move, 1.5, True)
+            animation(self, self.img_move, 2, True)
             self.shooting = False
         else:
-            animation(self, self.img_idle, 1.5, True)
+            animation(self, self.img_idle, 2, True)
 
 
 
@@ -262,7 +271,14 @@ class Enemy(Mob):
 class Player(Mob):
     name = 'survivor'
     bullets = pygame.sprite.Group()
+    BACKGROUND = locations_imgs[14]
+    background_rect = BACKGROUND.get_rect()
 
+    def check_portal(self):
+        tps = pygame.sprite.spritecollide(self, portals, False)
+        if tps:
+            print(tps[0].pos)
+            self.change_location(LOCATIONS[PR_LOC][tps[0].pos], tps[0].pos)
 
     def update(self):
         self.velocity_rel = Vector(0, 0)
@@ -286,63 +302,62 @@ class Player(Mob):
 
         super().move()
         self.check_bullet(Enemy.bullets)
+        self.check_portal()
+
+    def change_location(self, new_loc, portal):
+        '''Функция, осуществляющая смену локации.'''
+
+        global PR_LOC, portals, all_sprites
+
+        portals = []
+        for sprt in all_sprites:
+            if sprt != self:
+                sprt.kill()
+
+        if portal == 0:
+            self.rect.centerx, self.rect.centery = self.rect.centerx, 500
+            self.position.x, self.position.y = self.rect.centerx, 500
+        elif portal == 1:
+            self.rect.centerx, self.rect.centery = 130, self.rect.centery
+            self.position.x, self.position.y = 130, self.rect.centery
+        elif portal == 2:
+            self.rect.centerx, self.rect.centery = self.rect.centerx, 100
+            self.position.x, self.position.y =self.rect.centerx, 100
+        else:
+            self.rect.centerx, self.rect.centery = 670, self.rect.centery
+            self.position.x, self.position.y = 670, self.rect.centery
+        print(new_loc)
+        print(new_loc[1])
+        self.BACKGROUND = locations_imgs[new_loc[1]]
+        self.background_rect = self.BACKGROUND.get_rect()
+        PR_LOC = new_loc
+        # TODO добавление объектов в локации new_loc
+        for i in range(4):
+            if LOCATIONS[new_loc][i] != -1:
+                portals.append(Portal(i, LOCATIONS[new_loc][i]))
+                all_sprites.add(portals[-1])
 
 
 class Portal(pygame.sprite.Sprite):
 
-    def __init__(self, points, *, thickness=2, location='surface'):
+    def __init__(self, pos, way, *, lenth=90, thickness=4):
         pygame.sprite.Sprite.__init__(self)
-        if points[0][0] == points[1][0]:
-            self.image = pygame.Surface((thickness, abs(points[0][1] - points[1][1]) // 2))
+        self.pos = pos
+        if pos == 0:
+            self.image = pygame.Surface((lenth, thickness))
             self.rect = self.image.get_rect()
-            self.rect.center = (center.x, center.y)
-        else:
-            self.image = pygame.Surface((abs(points[0][0] - points[1][0]) // 2, thickness))
+            self.rect.center = (400, 60)
+        elif pos == 2:
+            self.image = pygame.Surface((lenth, thickness))
             self.rect = self.image.get_rect()
-            self.rect.center = (abs(points[0][0] + points[1][0]) // 2, abs(points[0][1] + points[1][1]) // 2)
-
-
-class Location:
-    """Класс локации (комнаты).
-            Это - сцена для объектов всей игры,
-            вне локаций - зона уничтожения объектов."""
-
-    LOCATIONS = dict()  # двухсторонний граф связей всех локаций, словарь вида
-    # LOCATIONS = {
-    #   локация: {
-    #           название соседней локации: [вершины, задающие переход между локациями]
-    #           }
-    # }
-
-
-    def __init__(self, *, coords=None, color=None, image=None, max_velocity=[100, 100], owners=dict()):
-        if coords is None:
-            raise TypeError
-        self.coords = coords
-        if id is not None:
-            self.id = id
+            self.rect.center = (400, 540)
+        elif pos == 1:
+            self.image = pygame.Surface((thickness, lenth))
+            self.rect = self.image.get_rect()
+            self.rect.center = (710, 300)
         else:
-            self.color = color if color is not None else choice(['grey', 'white', 'orange', 'brown'])
-            self.id = canv.create_polygon(coords, fill=self.color)
-        self.max_vel = max_velocity
-        LOCATIONS[self] = owners
-        for loc in owners:
-            LOCATIONS[loc][self] = owners[loc]
-        # self.walls =
-        # self.doors =
-        # self.guests =
-
-    def is_included(self, object):
-        """Артибут проверки того,
-        что локация содержит данный объект."""
-        return False
-
-    def was_changed(self, object):
-        """Атрибут проверки того,
-        что данный объект изменил свою локацию после движения."""
-        return object.l
-
-    def is_connected(self, location):
-        """Атрибут проверки того,
-        что две локации соединены переходом."""
-        return False
+            self.image = pygame.Surface((thickness, lenth))
+            self.rect = self.image.get_rect()
+            self.rect.center = (90, 300)
+        #self.image.fill(YELLOW)
+        self.way = way
