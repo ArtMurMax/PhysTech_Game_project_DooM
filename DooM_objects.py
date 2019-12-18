@@ -5,23 +5,6 @@ import math
 from time import time
 import random
 
-WIDTH = 800
-HEIGHT = 600
-FPS = 60
-
-TOP = 60
-BOTTOM = 540
-RIGHT = 710
-LEFT = 90
-
-# Задаем цвета
-WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-RED = (255, 0, 0)
-GREEN = (0, 255, 0)
-BLUE = (0, 0, 255)
-YELLOW = (255, 255, 0)
-
 game_folder = os.path.dirname(__file__)
 img_folder = os.path.join(game_folder, 'img')
 locations_folder = os.path.join(img_folder, 'room2')
@@ -41,6 +24,25 @@ all_sprites = pygame.sprite.Group()
 mobs = []
 portals = []
 PR_LOC = START
+
+def str(self, angle):
+    self.angle = angle
+
+def str_zombie(self):
+    vision, angle = self.check_vision()
+    if (vision or abs(self.angle - angle) < 1E-2 and abs(self.player_vector) < self.r_of_vision) and abs(self.player_vector) > 25:
+        self.angle = angle
+        self.velocity_rel.x = 2
+    elif 10 < abs(self.player_vector) <= 25:
+        self.velocity_rel.x = 0.5
+    elif abs(self.player_vector) <= 10:
+        animation(self, self.img_attack, 1.5, True)
+        self.player.hp -= self.damage
+        if random.randint(0, 25) == 0:
+            snd_zombie.play()
+        self.velocity_rel.x = 0
+    else:
+        self.velocity_rel.x = 0
 
 class Vector():
     def __init__(self, x, y):
@@ -326,8 +328,6 @@ class Player(Mob):
         else:
             self.rect.centerx, self.rect.centery = 670, self.rect.centery
             self.position.x, self.position.y = 670, self.rect.centery
-        print(new_loc)
-        print(new_loc[1])
         self.BACKGROUND = locations_imgs[new_loc[1]]
         self.background_rect = self.BACKGROUND.get_rect()
         PR_LOC = new_loc
@@ -336,6 +336,9 @@ class Player(Mob):
             if LOCATIONS[new_loc][i] != -1:
                 portals.append(Portal(i, LOCATIONS[new_loc][i]))
                 all_sprites.add(portals[-1])
+        for i in range(LOCATIONS[new_loc][-1]):
+            mobs.append(Enemy('skeleton', Vector(random.randint(LEFT, RIGHT), random.randint(TOP, BOTTOM)), 180 * (random.random()) * math.pi / 180, self, 100, str_zombie, 16, r_of_vision=300))
+            all_sprites.add(mobs[-1])
 
 
 class Portal(pygame.sprite.Sprite):
