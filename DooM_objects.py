@@ -11,7 +11,7 @@ img_folder = os.path.join(game_folder, 'img')
 locations_folder = os.path.join(img_folder, 'room2')
 mob_folder = os.path.join(img_folder, 'mob')
 bullet_img = pygame.transform.scale(pygame.image.load(os.path.join(img_folder, 'bullet.png')), (5, 16))
-invisible_bullet_img = bullet_img #pygame.image.load(os.path.join(img_folder, 'invisible_bullet.png'))
+invisible_bullet_img = pygame.transform.scale(pygame.image.load(os.path.join(img_folder, 'unvisible_bullet.png')), (5, 16))
 locations_imgs = [pygame.image.load(os.path.join(locations_folder, 'room00%02i.png' % (i))) for i in range(16)]
 medkit_img = pygame.transform.scale(pygame.image.load(os.path.join(img_folder, 'medkit.png')), (20, 20))
 pygame.mixer.init()
@@ -205,6 +205,8 @@ class Mob(pygame.sprite.Sprite):
         if self.hp <= 0:
             self.kill()
             LOCATIONS[PR_LOC][-1] -= 1
+        if self.hp > 100:
+            self.hp = 100
 
     def move(self):
         self.angle += self.w
